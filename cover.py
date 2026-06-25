@@ -15,6 +15,20 @@ from .crestron_home_sdk.models import ShadePositionItem
 from .entity import CrestronEntity
 
 
+# Crestron shade positions are integers in the range 0-65535 (not 0-100).
+POSITION_MAX = 65535
+
+
+def _position_to_ha(position: int | None) -> int | None:
+    if position is None:
+        return None
+    return max(0, min(100, round(position * 100 / POSITION_MAX)))
+
+
+def _ha_to_position(position: int) -> int:
+    return max(0, min(POSITION_MAX, round(position * POSITION_MAX / 100)))
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -72,7 +86,7 @@ class CrestronShadeCover(CrestronEntity, CoverEntity):
         s = self._shade()
         if not s or s.position is None:
             return None
-        return max(0, min(100, s.position))
+        return _position_to_ha(s.position)
 
     @property
     def is_closed(self) -> bool | None:
@@ -105,7 +119,7 @@ class CrestronShadeCover(CrestronEntity, CoverEntity):
         await self._async_set_position(int(position))
 
     async def _async_set_position(self, position: int) -> None:
-        pos = max(0, min(100, position))
+        pos = _ha_to_position(max(0, min(100, position)))
 
         def _set() -> None:
             self.coordinator.hub.client.shades_set_state(
