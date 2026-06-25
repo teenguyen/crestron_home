@@ -1,0 +1,64 @@
+# Byte-compiled / optimized Python files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Packaging / distribution
+*.egg
+*.egg-info/
+.eggs/
+dist/
+build/
+*.whl
+
+# Test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Type checkers / linters
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+dmypy.json
+
+# IDE / editor
+.idea/
+*.swp
+*.swo
+*~
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Secrets and local config
+.env
+.env.*
+*.pem
+secrets.yaml
+*.local.yaml
+
+# Logs
+*.log
+
+# Home Assistant (when developing against a local config tree)
+.storage/
+home-assistant_v2.db
+home-assistant_v2.db-*
+deps/
+tts/
+www/

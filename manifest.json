@@ -1,0 +1,10 @@
+{
+  "domain": "crestron_home",
+  "name": "Crestron Home",
+  "version": "0.1.0",
+  "documentation": "https://sdkcon78221.crestron.com/sdk/Crestron-Home-API/Content/Topics/API-Reference/API-Reference.htm",
+  "requirements": ["httpx>=0.27", "pydantic>=2.7"],
+  "config_flow": true,
+  "iot_class": "local_polling",
+  "integration_type": "hub"
+}

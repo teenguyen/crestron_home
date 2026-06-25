@@ -1,0 +1,25 @@
+{
+  "domain": "crestron_home",
+  "title": "Crestron Home",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Crestron Home",
+        "description": "Use the processor HTTPS base URL (e.g. https://192.168.1.10) and the Web API token from the Crestron Home installer app. Disable TLS verification only if the processor uses a self-signed certificate.",
+        "data": {
+          "url": "Processor URL",
+          "token": "Web API token",
+          "verify_ssl": "Verify SSL certificate"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not connect or login. Check URL, network, and SSL settings.",
+      "invalid_auth": "Authentication failed. Check the Web API token.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This processor is already configured."
+    }
+  }
+}
