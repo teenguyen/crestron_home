@@ -17,6 +17,27 @@ from .crestron_home_sdk.models import ThermostatModeEntry, ThermostatSetpointEnt
 from .entity import CrestronEntity
 
 
+# Crestron thermostat temperatures are integers in tenths of a degree
+# (e.g. 770 = 77.0°, 590 = 59.0°), regardless of the temperatureUnits
+# granularity (FahrenheitWholeDegrees / CelsiusWholeDegrees / CelsiusHalfDegrees).
+TEMP_SCALE = 10
+
+
+def _api_temp_to_native(value: int | str | None) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        try:
+            value = float(value)
+        except ValueError:
+            return None
+    return value / TEMP_SCALE
+
+
+def _native_temp_to_api(value: float) -> int:
+    return int(round(value * TEMP_SCALE))
+
+
 def _api_hvac_to_ha(mode: str | None) -> HVACMode:
     if not mode:
         return HVACMode.UNKNOWN
@@ -74,8 +95,6 @@ async def async_setup_entry(
 
 class CrestronClimate(CrestronEntity, ClimateEntity):
     """Climate entity backed by CWS thermostats."""
-
-    _attr_precision = 1.0
 
     def __init__(
         self,
@@ -160,28 +179,22 @@ class CrestronClimate(CrestronEntity, ClimateEntity):
         if not th:
             return None
         v = th.current_temperature if th.current_temperature is not None else th.temperature
-        if v is None:
-            return None
-        return float(v)
+        return _api_temp_to_native(v)
 
     @property
     def target_temperature(self) -> float | None:
         th = self._t()
         if not th or not th.set_point or th.set_point.temperature is None:
             return None
-        tv = th.set_point.temperature
-        if isinstance(tv, str):
-            try:
-                return float(tv)
-            except ValueError:
-                return None
-        return float(tv)
+        return _api_temp_to_native(th.set_point.temperature)
 
     @property
     def min_temp(self) -> float:
         th = self._t()
         if th and th.set_point and th.set_point.min_value is not None:
-            return float(th.set_point.min_value)
+            v = _api_temp_to_native(th.set_point.min_value)
+            if v is not None:
+                return v
         if self._native_unit() == UnitOfTemperature.FAHRENHEIT:
             return 45.0
         return 7.0
@@ -190,20 +203,35 @@ class CrestronClimate(CrestronEntity, ClimateEntity):
     def max_temp(self) -> float:
         th = self._t()
         if th and th.set_point and th.set_point.max_value is not None:
-            return float(th.set_point.max_value)
+            v = _api_temp_to_native(th.set_point.max_value)
+            if v is not None:
+                return v
         if self._native_unit() == UnitOfTemperature.FAHRENHEIT:
             return 95.0
         return 35.0
 
     def _native_unit(self) -> str:
         th = self._t()
-        if th and th.temperature_units and "F" in th.temperature_units.upper():
+        # e.g. "FahrenheitWholeDegrees"; match the full word so "CelsiusHalfDegrees"
+        # (which contains an "f") is not misread as Fahrenheit.
+        if th and th.temperature_units and "FAHRENHEIT" in th.temperature_units.upper():
             return UnitOfTemperature.FAHRENHEIT
         return UnitOfTemperature.CELSIUS
 
     @property
     def native_temperature_unit(self) -> str:
         return self._native_unit()
+
+    @property
+    def target_temperature_step(self) -> float:
+        th = self._t()
+        if th and th.temperature_units and "HALF" in th.temperature_units.upper():
+            return 0.5
+        return 1.0
+
+    @property
+    def precision(self) -> float:
+        return self.target_temperature_step
 
     def _setpoint_type_for_mode(self, th) -> str:
         hvac = _api_hvac_to_ha(th.mode)
@@ -225,7 +253,7 @@ class CrestronClimate(CrestronEntity, ClimateEntity):
         if not th:
             return
         sp_type = self._setpoint_type_for_mode(th)
-        t_int = int(round(float(temp)))
+        t_int = _native_temp_to_api(float(temp))
 
         def _set() -> None:
             self.coordinator.hub.client.thermostats_set_point_for(
