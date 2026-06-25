@@ -231,7 +231,15 @@ class CrestronClimate(CrestronEntity, ClimateEntity):
 
     @property
     def precision(self) -> float:
-        return self.target_temperature_step
+        # Display resolution: DeciCelsius reports tenths (e.g. 231 = 23.1°),
+        # half-degree units report 0.5°, otherwise whole degrees.
+        th = self._t()
+        units = (th.temperature_units or "").upper() if th else ""
+        if "DECI" in units:
+            return 0.1
+        if "HALF" in units:
+            return 0.5
+        return 1.0
 
     def _setpoint_type_for_mode(self, th) -> str:
         hvac = _api_hvac_to_ha(th.mode)

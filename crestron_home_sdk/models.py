@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 
 class CommandStatus(str, Enum):
@@ -177,8 +177,14 @@ class Thermostat(BaseModel):
 
     id: int
     name: str
-    mode: str | None = None
-    set_point: ThermostatSetpointInfo | None = Field(None, alias="setPoint")
+    # Firmware reports the active mode as "currentMode"; older docs used "mode".
+    mode: str | None = Field(None, validation_alias=AliasChoices("currentMode", "mode"))
+    # Firmware reports "currentSetPoint" as an ARRAY of setpoints (one per active
+    # type; when off, a single entry with no temperature). Older docs showed a
+    # single "setPoint" object, so either form is normalized to a list below.
+    current_set_point: list[ThermostatSetpointInfo] | None = Field(
+        None, validation_alias=AliasChoices("currentSetPoint", "setPoint")
+    )
     current_temperature: int | None = Field(None, alias="currentTemperature")
     temperature: int | None = None
     temperature_units: str | None = Field(None, alias="temperatureUnits")
@@ -189,6 +195,45 @@ class Thermostat(BaseModel):
     available_set_points: list[ThermostatSetpointInfo] | None = Field(None, alias="availableSetPoints")
     connection_status: str | None = Field(None, alias="connectionStatus")
     room_id: int | None = Field(None, validation_alias=AliasChoices("roomId", "roomid"))
+
+    @field_validator("current_set_point", mode="before")
+    @classmethod
+    def _normalize_set_point(cls, v: Any) -> Any:
+        # Accept either a single object (older docs) or a list (firmware).
+        if isinstance(v, dict):
+            return [v]
+        return v
+
+    @property
+    def set_point(self) -> ThermostatSetpointInfo | None:
+        """The active setpoint, enriched with min/max from availableSetPoints.
+
+        ``currentSetPoint`` entries carry only ``type``/``temperature`` (and when
+        the thermostat is off, no temperature at all); the min/max bounds live in
+        ``availableSetPoints`` for the matching type.
+        """
+        entries = self.current_set_point or []
+        active = next((sp for sp in entries if sp.temperature is not None), None)
+        if active is None and entries:
+            active = entries[0]
+        if active is None:
+            return None
+        min_value = active.min_value
+        max_value = active.max_value
+        if (min_value is None or max_value is None) and self.available_set_points:
+            for avail in self.available_set_points:
+                if avail.type and active.type and avail.type.lower() == active.type.lower():
+                    if min_value is None:
+                        min_value = avail.min_value
+                    if max_value is None:
+                        max_value = avail.max_value
+                    break
+        return ThermostatSetpointInfo(
+            type=active.type,
+            temperature=active.temperature,
+            min_value=min_value,
+            max_value=max_value,
+        )
 
 
 class ThermostatsResponse(BaseModel):
