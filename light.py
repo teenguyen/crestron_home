@@ -15,14 +15,18 @@ from .crestron_home_sdk.models import LightStateItem
 from .entity import CrestronEntity
 
 
+# Crestron lighting load levels are integers in the range 0-65535 (not 0-100).
+LEVEL_MAX = 65535
+
+
 def _level_to_brightness(level: int | None) -> int | None:
     if level is None:
         return None
-    return max(0, min(255, round(level * 255 / 100)))
+    return max(0, min(255, round(level * 255 / LEVEL_MAX)))
 
 
 def _brightness_to_level(brightness: int) -> int:
-    return max(0, min(100, round(brightness * 100 / 255)))
+    return max(0, min(LEVEL_MAX, round(brightness * LEVEL_MAX / 255)))
 
 
 async def async_setup_entry(
@@ -108,7 +112,7 @@ class CrestronLight(CrestronEntity, LightEntity):
             level = _brightness_to_level(int(brightness))
         else:
             prev = self._light
-            level = prev.level if prev and prev.level else 100
+            level = prev.level if prev and prev.level else LEVEL_MAX
 
         def _set() -> None:
             self.coordinator.hub.client.lights_set_state(
